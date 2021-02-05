@@ -10,6 +10,8 @@ public class SunGravity : MonoBehaviour
     public GameObject sun;
     public GameObject earth;
 
+    public Material lineMaterial;
+
     // Masses scaled
     private static float scaling = 1.0f * Mathf.Pow(10, -10);
     private float sunMass = 1.989f * Mathf.Pow(10, 30) * scaling;
@@ -23,8 +25,12 @@ public class SunGravity : MonoBehaviour
 
     Dictionary <GameObject, Vector3> velocities = new Dictionary<GameObject, Vector3>();
 
+    // Holding values for lines
+    private static int maxLinePoints = 1000;
+    Dictionary <GameObject, GameObject> lines = new Dictionary<GameObject, GameObject>();
+
     // Tweak variables
-    private float time = 0.000005f;
+    private float time = 0.00005f;
     private int iterationsPerTime = 1;
     private int iterationsPerTimeMin = 1;
     private int iterationsPerTimeMax = 100;
@@ -52,8 +58,27 @@ public class SunGravity : MonoBehaviour
 
     }
 
+    
+    GameObject DrawLine(Vector3 start, Vector3 end, Color color, float duration = 10.0f)
+    {
+        GameObject myLine = new GameObject();
+        myLine.name = "NewLine";
+        myLine.transform.position = start;
+        myLine.AddComponent<LineRenderer>();
+        LineRenderer lr = myLine.GetComponent<LineRenderer>();
+        lr.material = new Material(Shader.Find("Sprites/Default"));
+        //lr.material = new Material(lineMaterial);
+        lr.SetColors(color, color);
+        lr.SetWidth(0.2f, 0.2f);
+        lr.SetPosition(0, start);
+        lr.SetPosition(1, end);
+        //GameObject.Destroy(myLine, duration);
+        return myLine;
+    }
+
     void initialSunGravity() {
         Vector3 sunPosition = sun.transform.position;
+        GameObject lineHolder = GameObject.Find("LineHolder");
         
         GameObject[] planets = GameObject.FindGameObjectsWithTag("planet");
         foreach (GameObject planet in planets) {
@@ -76,6 +101,10 @@ public class SunGravity : MonoBehaviour
             Debug.Log("Calculated Velocity for Planet " + planet.name + ": " + distance + " units away " + initialVelocity  + "-> " + scaledVelocity + " force: " + force);
 
             velocities.Add(planet, Vector3.Scale(new Vector3(scaledVelocity, scaledVelocity, scaledVelocity), planet.transform.forward));
+            GameObject line = DrawLine(planetPosition, planetPosition, Color.white);
+            lines.Add(planet, line);
+            line.name = planet.name + " line";
+            line.transform.SetParent(lineHolder.transform);
         }
     }
 
@@ -140,12 +169,14 @@ public class SunGravity : MonoBehaviour
 
     }
 
+
     void deltaSunGravity() {
         
         Vector3 sunPosition = sun.transform.position;
 
         GameObject[] gameObjects = GameObject.FindGameObjectsWithTag("planet");
         foreach (GameObject planet in gameObjects) {
+            Vector3 planetFirstPosition = planet.transform.position;
             for (int i = 0; i < iterationsPerTime; i++) {
                 Vector3 planetPosition = planet.transform.position;
                 Vector3 acceleration = (calculateForce(sun, sunMass, planet, planetMass) / planetMass);
@@ -161,6 +192,24 @@ public class SunGravity : MonoBehaviour
                 Vector3 newVelocity = (newPosition - planetPosition) / relativeTime;
                 velocities[planet] = newVelocity;
             }
+
+            GameObject planetLine = lines[planet];
+            LineRenderer lr = planetLine.GetComponent<LineRenderer>();
+            lr.positionCount = lr.positionCount + 1;
+            lr.SetPosition(lr.positionCount -1, planet.transform.position);
+
+            if (lr.positionCount > maxLinePoints) {
+                //int newPositionCount = lr.positionCount - 1;
+                Vector3[] newPositions = new Vector3[maxLinePoints];
+                
+                for (int i = 0; i < maxLinePoints; i++){
+                  newPositions[i] = lr.GetPosition(i + 1);
+                }
+                
+                lr.positionCount = maxLinePoints;
+                lr.SetPositions(newPositions);
+            }
+
         }
 
     }
